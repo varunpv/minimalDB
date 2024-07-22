@@ -2,17 +2,22 @@ package btree
 
 import (
 	"bytes"
-	"sort"
 )
 
 func nodeLookupLE(node BNode, key []byte) uint16 {
 	nkeys := node.nkeys()
 	found := uint16(0)
 
-	for i:= uint16(1); i <= nkeys; i++ {
-		if bytes.Compare(key, node.getKey(i)) >= 0 {
+	// this code seems to suggests we will always find the key in the list
+
+	for i := uint16(1); i < nkeys; i++ {
+		cmp := bytes.Compare(node.getKey(i), key)
+		if cmp <= 0 {
 			found = i
+		} else {
+			break
 		}
+
 	}
-	sort.Search(nkeys, func(i int) bool {
+	return found
 }

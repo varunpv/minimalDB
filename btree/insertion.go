@@ -2,6 +2,7 @@ package btree
 
 import (
 	"bytes"
+	"encoding/binary"
 )
 
 func nodeLookupLE(node BNode, key []byte) uint16 {
@@ -58,4 +59,19 @@ func nodeAppendRange(new BNode, old BNode, dstNew uint16, srcOld uint16, n uint1
 	end := old.kvPos(srcBegin + n)
 	copy(new.data[new.kvPos(dstNew):], old.data[begin:end])
 
+}
+
+func nodeAppendKV(new BNode, idx uint16, ptr uint64, key []byte, value []byte) {
+	//pointers
+	new.setPtr(idx, ptr)
+	//kvs
+	pos := new.kvPos(idx)
+
+	binary.LittleEndian.PutUint16(new.data[pos:], uint16(len(key)))
+	binary.LittleEndian.PutUint16(new.data[pos+2:], uint16(len(value)))
+	copy(new.data[pos+4:], key)
+	copy(new.data[pos+4+uint16(len(key)):], value)
+
+	// the offset of the next key
+	new.setOffset(idx+1, new.getOffset(idx)+4+uint16(len(key)+len(value)))
 }

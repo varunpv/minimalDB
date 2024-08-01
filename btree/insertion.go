@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 )
 
+// TODO: use binary search here
 func nodeLookupLE(node BNode, key []byte) uint16 {
 	nkeys := node.nkeys()
 	found := uint16(0)
@@ -28,6 +29,13 @@ func leafInsert(new BNode, old BNode, idx uint16, key []byte, value []byte) {
 	nodeAppendRange(new, old, 0, 0, idx)
 	nodeAppendKV(new, idx, 0, key, value)
 	nodeAppendRange(new, old, idx+1, idx, old.nkeys()-idx)
+}
+
+func leafupdate(new BNode, old BNode, idx uint16, key []byte, value []byte) {
+	new.setHeader(BNODE_LEAF, old.nkeys())
+	nodeAppendRange(new, old, 0, 0, idx)
+	nodeAppendKV(new, idx, 0, key, value)
+	nodeAppendRange(new, old, idx+1, idx+1, old.nkeys()-(idx+1))
 }
 
 //copy multiple key value into position
@@ -74,4 +82,26 @@ func nodeAppendKV(new BNode, idx uint16, ptr uint64, key []byte, value []byte) {
 
 	// the offset of the next key
 	new.setOffset(idx+1, new.getOffset(idx)+4+uint16(len(key)+len(value)))
+}
+
+func treeInsert(tree *BTree, node BNode, key []byte, value []byte) BNode {
+	new := BNode{data: make([]byte, 2*BTREE_PAGE_SIZE)}
+	//where do we insert the inputed key?
+	idx := nodeLookupLE(node, key)
+
+	switch node.btype() {
+	case BNODE_LEAF:
+		if bytes.Equal(key, node.getKey(idx)) {
+			leafupdate(new, node, idx, key, value)
+		} else {
+			leafInsert(new, node, idx+1, key, value)
+		}
+	case BNODE_NODE:
+		nodeInsert(tree, new, node, idx, key, value)
+	}
+	return new
+}
+
+func nodeInsert(tree *BTree, new BNode, node BNode, idx uint16, key []byte, value []byte) {
+	//TODO implement this method
 }

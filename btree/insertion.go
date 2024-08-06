@@ -103,5 +103,71 @@ func treeInsert(tree *BTree, node BNode, key []byte, value []byte) BNode {
 }
 
 func nodeInsert(tree *BTree, new BNode, node BNode, idx uint16, key []byte, value []byte) {
-	//TODO implement this method
+	kptr := node.getPtr(idx)
+	knode := tree.get(kptr)
+	tree.del(kptr)
+	// recursive insertion to the kid node
+	knode = treeInsert(tree, knode, key, value)
+	// split the result
+	nsplit, splited := nodeSplit3(knode)
+	// update the kid links
+	nodeReplaceKidN(tree, new, node, idx, splited[:nsplit]...)
+}
+
+func nodeSplit2(left, right, old BNode) {
+	halfSize := old.nbytes() / 2
+
+	left.setHeader(old.btype(), 1)
+	nodeAppendRange(left, old, 0, 0, 1)
+
+	i := uint16(1)
+	for {
+		// 8 ptr; 2 offset; 4 keylen vallen
+		nextleftSize := left.nbytes() + 8 + 2 + 4 + uint16(len(old.getKey(i))+len(old.getVal(i)))
+
+		if len(left.data) == 2*BTREE_PAGE_SIZE {
+			if left.nbytes() > halfSize {
+				break
+			}
+		} else {
+			if nextleftSize > halfSize {
+				break
+			}
+		}
+
+		nodeAppendRange(left, old, i, i, 1)
+		i = i + 1
+	}
+
+	nodeAppendRange(right, old, 0, i, old.nkeys()-i)
+}
+
+func nodeSplit3(old BNode) (uint16, [3]BNode) {
+	if old.nbytes() <= BTREE_PAGE_SIZE {
+		old.data = old.data[:BTREE_PAGE_SIZE]
+		return 1, [3]BNode{old}
+	}
+	left := BNode{make([]byte, 2*BTREE_PAGE_SIZE)} // might be split later
+	right := BNode{make([]byte, BTREE_PAGE_SIZE)}
+	nodeSplit2(left, right, old)
+	if left.nbytes() <= BTREE_PAGE_SIZE {
+		left.data = left.data[:BTREE_PAGE_SIZE]
+		return 2, [3]BNode{left, right}
+	}
+	// the left node is still too large
+	leftleft := BNode{make([]byte, BTREE_PAGE_SIZE)}
+	middle := BNode{make([]byte, BTREE_PAGE_SIZE)}
+	nodeSplit2(leftleft, middle, left)
+	assert(leftleft.nbytes() <= BTREE_PAGE_SIZE)
+	return 3, [3]BNode{leftleft, middle, right}
+}
+
+func nodeReplaceKidN(tree *BTree, new, old BNode, idx uint16, kids ...BNode) {
+	inc := uint16(len(kids))
+	new.setHeader(BNODE_NODE, old.nkeys()+inc-1)
+	nodeAppendRange(new, old, 0, 0, idx)
+	for i, node := range kids {
+		nodeAppendKV(new, idx+uint16(i), tree.new(node), node.getKey(0), nil)
+	}
+	nodeAppendRange(new, old, idx+inc, idx+1, old.nkeys()-(idx+1))
 }

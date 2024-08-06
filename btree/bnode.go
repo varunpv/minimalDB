@@ -77,7 +77,7 @@ func (node BNode) getKey(idx uint16) []byte {
 	return node.data[pos+4:][:klen]
 }
 
-func (node BNode) getValue(idx uint16) []byte {
+func (node BNode) getVal(idx uint16) []byte {
 	assert(idx < node.nkeys())
 	pos := node.kvPos(idx)
 	klen := binary.LittleEndian.Uint16(node.data[pos:])
